@@ -1,4 +1,4 @@
-classdef AolFftModel < handle
+classdef AolFftModel
     
     properties
         fft_adjustment
@@ -25,8 +25,8 @@ classdef AolFftModel < handle
             obj.wavevector = 2*pi/800e-9;
             obj.acoustic_velocity = 613; % speed of sound in TeO2
             obj.aod_spacing = 0.04554;
-            obj.aod_half_aperture_width = 15e-3; % the aperture width
-            obj.beam_width = 3.75e-3; % 68% of field within +- beam_sigma, 95% of field within +- 2 beam_sigma, equiv. beam intensity falls off to 1/e after beam_sigma
+            obj.aod_half_aperture_width = 7.5e-3; % half aperture width
+            obj.beam_width = 5e-3; % 68% of field within +- beam_sigma, 95% of field within +- 2 beam_sigma, equiv. beam intensity falls off to 1/e after beam_sigma
             obj.aol_to_objective_scaling = 0.8; % scaling by the relay between AOL and objective
             obj.objective_magnification = 20;
             obj.tube_lens_focal_length = 160e-3;
@@ -39,7 +39,7 @@ classdef AolFftModel < handle
             focal_plane_wave_2d = obj.get_wave_in_focal_plane(waves);
             space_width_focal_plane = obj.focal_region_xy();
             ref_ind_water = 4/3;
-            focal_region_wave_3d = obj.propagate_wave(focal_plane_wave_2d, space_width_focal_plane, ref_ind_water);
+            focal_region_wave_3d = obj.propagate_wave(focal_plane_wave_2d, obj.z_range, space_width_focal_plane, ref_ind_water);
         end
         
         function focal_plane_wave_2d = get_wave_in_focal_plane(obj, waves)
@@ -50,30 +50,33 @@ classdef AolFftModel < handle
         function sampled_wave = get_wave_leaving_aol(obj, waves)     
             % take a number of waves of phase shift for each AOD and a time to calculate the wave out of the last AOD
             num_aods = numel(waves.aods);
-            distances = [ones(1,num_aods-1)*obj.aod_spacing, 0];
             directions = linspace(0, 2 * pi, num_aods + 1);
             ref_ind_air = 1; 
+            width = obj.aol_region_xy();
             
-            sampled_wave = obj.input_wave();
-            
-            for n = 1:num_aods
-                phase_shift = obj.aod_phase_shift(directions(n), waves{n});
-                sampled_wave = obj.propagate_wave(sampled_wave, distances(n), space_width, ref_ind_air) .* phase_shift;
-            end
-            
-            sampled_wave = sampled_wave .* obj.aperture(obj.aod_half_aperture_width ./ obj.aol_to_objective_scaling);
-            sampled_wave = sampled_wave .* exp(1i * 2*pi * waves.focus     * ((x.^2 + y.^2)    ./ obj.aod_half_aperture_width.^2));
-            sampled_wave = sampled_wave .* exp(1i * 2*pi * waves.spherical * ((x.^2 + y.^2).^2 ./ obj.aod_half_aperture_width.^4)); 
+            sampled_wave = obj.input_wave() .* obj.aod_phase_shift(directions(1), waves.aods{1});
+            for n = 2:num_aods
+                sampled_wave = obj.propagate_wave(sampled_wave, obj.aod_spacing, width, ref_ind_air);
+                sampled_wave = sampled_wave .* obj.aod_phase_shift(directions(n), waves.aods{n});
+            end  
+            sampled_wave = sampled_wave .* obj.output_wave(waves);
         end
         
         function input = input_wave(obj)
-            [x, y, ~] = obj.aol_region_xy();
-            gaussian = exp(-(x.^2 + y.^2)/2/(obj.beam_width).^2);
+            [~, x, y] = obj.aol_region_xy();
+            gaussian = exp(-(x.^2 + y.^2)/(obj.beam_width).^2);
             input = gaussian .* obj.aperture(obj.aod_half_aperture_width);
         end
         
+        function output = output_wave(obj, waves)
+            [~, x, y] = obj.aol_region_xy();
+            output = obj.aperture(obj.aod_half_aperture_width ./ obj.aol_to_objective_scaling);
+            output = output .* exp(1i * 2*pi * waves.focus     * ((x.^2 + y.^2)    ./ obj.aod_half_aperture_width.^2));
+            output = output .* exp(1i * 2*pi * waves.spherical * ((x.^2 + y.^2).^2 ./ obj.aod_half_aperture_width.^4)); 
+        end
+        
         function apertured = aperture(obj, half_width)
-            [x, y, ~] = obj.aol_region_xy();
+            [~, x, y] = obj.aol_region_xy();
             apertured = (sqrt(x.^2 + y.^2) < half_width);
         end
 
@@ -95,11 +98,12 @@ classdef AolFftModel < handle
         end
         
         function phase_shift = aod_phase_shift(obj, orientation, aod_waves)
-            r = x.*cos(orientation) + y.*sin(orientation) - obj.acoustic_velocity * t;
-            aod_phase = 2*pi * aod_waves ./ obj.aod_half_aperture_width .^ (1:5);
-            phase_shift = 0;
+            [~, x, y] = obj.aol_region_xy();
+            r = x.*cos(orientation) + y.*sin(orientation) - obj.acoustic_velocity * obj.time;
+            aod_phase = 2*pi * aod_waves;
+            phase_shift = 1;
             for m = 1:5
-                phase_shift = phase_shift * exp(1i * (aod_phase(m) .* r.^m));
+                phase_shift = phase_shift .* exp(1i .* (aod_phase(m) .* (r ./ obj.aod_half_aperture_width) .^ m));
             end
         end
         
@@ -114,9 +118,9 @@ classdef AolFftModel < handle
         end        
         
         function [width, x, y] = aol_region_xy(obj)
-            samples = linspace(-1/2, 1/2, obj.fft_number_of_samples) * space_width;
-            [x, y] = meshgrid(samples);
             width = pi * obj.fft_number_of_samples / obj.wavevector * obj.fft_adjustment;
+            samples = linspace(-1/2, 1/2, obj.fft_number_of_samples) * width;
+            [x, y] = meshgrid(samples);
         end
     end
 end
