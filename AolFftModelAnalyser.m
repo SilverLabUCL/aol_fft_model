@@ -28,6 +28,7 @@ classdef AolFftModelAnalyser < handle
             intensity_3d = calculate_psf_through_aol(obj);
             res = obj.get_psf_dimensions(intensity_3d);
             if plot
+                figure();
                 subplot(1,3,1); obj.plot_psf_xy(intensity_3d)
                 subplot(1,3,2); obj.plot_psf_xz(intensity_3d)
                 subplot(1,3,3); obj.plot_psf_yz(intensity_3d)
@@ -66,7 +67,8 @@ classdef AolFftModelAnalyser < handle
             z_sqr_max = squeeze(max(max(abs(field_3d)))).^2;
             half_or_more_z = z_sqr_max >= max_intensity_sqr/2;
             z_res = max(z(half_or_more_z)) - min(z(half_or_more_z));
-            [sigma,~,~] = george_gaussfit(z, z_sqr_max);
+            
+            [sigma, ~] = obj.gaussfit(z, z_sqr_max);
             z_res = 2.35 * sigma;
             
             max_val = max(abs(field_3d(:)));
@@ -76,6 +78,13 @@ classdef AolFftModelAnalyser < handle
             max_intensity_sqr = max(max(abs(field_3d(:,:,ceil(numel(z)/2))).^2));
             total_fluores = sum(abs(field_3d(:)).^2);
             res = [[x_pos, z_pos] * 1e6, [x_res, z_res] * 1e6, log10(max_intensity_sqr), log10(total_fluores)];
+        end
+        
+        function [ sigma, mu ] = gaussfit(~, x, y)
+            ylog = log(y);
+            p = polyfit(x(:), ylog(:), 2);
+            sigma = -1 / sqrt(2 * p(1));
+            mu = p(2) * sigma^2;
         end
         
         function plot_psf_xy(obj, propagated_wave_2d)

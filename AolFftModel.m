@@ -51,6 +51,11 @@ classdef AolFftModel
             % take a number of waves of phase shift for each AOD and a time to calculate the wave out of the last AOD
             num_aods = numel(waves.aods);
             directions = linspace(0, 2 * pi, num_aods + 1);
+            if num_aods == 4
+                directions = directions(1:4);
+            else
+                directions = directions([6, 1:5]);
+            end
             ref_ind_air = 1; 
             width = obj.aol_region_xy();
             
