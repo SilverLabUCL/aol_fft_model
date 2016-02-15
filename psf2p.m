@@ -1,4 +1,4 @@
-na = 0.5:0.1:1;
+na = 0.5:0.01:1;
 lambda = 920e-9;
 
 wx = 0.32  * lambda / sqrt(2) ./ na;

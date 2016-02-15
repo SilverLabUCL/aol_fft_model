@@ -65,10 +65,10 @@ classdef AolFftModelAnalyser < handle
             x_res = max(x(half_or_more_x)) - min(x(half_or_more_x));
                         
             z_sqr_max = squeeze(max(max(abs(field_3d)))).^2;
-            half_or_more_z = z_sqr_max >= max_intensity_sqr/2;
-            z_res = max(z(half_or_more_z)) - min(z(half_or_more_z));
+            quarter_or_more_z = z_sqr_max >= max_intensity_sqr/4;
+            %z_res = max(z(half_or_more_z)) - min(z(half_or_more_z));
             
-            [sigma, ~] = obj.gaussfit(z, z_sqr_max);
+            [sigma, ~] = obj.gaussfit(z(quarter_or_more_z), z_sqr_max(quarter_or_more_z)');
             z_res = 2.35 * sigma;
             
             max_val = max(abs(field_3d(:)));
@@ -81,9 +81,8 @@ classdef AolFftModelAnalyser < handle
         end
         
         function [ sigma, mu ] = gaussfit(~, x, y)
-            ylog = log(y);
-            p = polyfit(x(:), ylog(:), 2);
-            sigma = -1 / sqrt(2 * p(1));
+            p = polyfit(x, log(y), 2);
+            sigma = 1 / sqrt(-2 * p(1));
             mu = p(2) * sigma^2;
         end
         
