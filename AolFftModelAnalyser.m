@@ -7,7 +7,7 @@ classdef AolFftModelAnalyser < handle
         z_range
         wavelengths
         wavelength_weightings
-        plot_intensity_squared
+        plot_intensity_power
         colormap
     end
     
@@ -20,15 +20,16 @@ classdef AolFftModelAnalyser < handle
             obj.wavelengths = [800, 800-1.75, 800+1.75, 800-2.5, 800+2.5] * 1e-9; 
             % obj.wavelengths = [920, 920-2.5, 920+2.5, 920-3.5, 920+3.5] * 1e-9;
             obj.wavelength_weightings = [1, 1/sqrt(2), 1/sqrt(2), 1/2, 1/2];
-            obj.plot_intensity_squared = false;
+            obj.plot_intensity_power = 1; % use 0.5 for field and 2 for 2-photon
             obj.colormap = 'jet';
         end
         
-        function res = analyse_and_plot_focus(obj, plot)
+        function res = analyse_and_plot_focus(obj, plot_power)
             intensity_3d = calculate_psf_through_aol(obj);
             res = obj.get_psf_dimensions(intensity_3d);
-            if plot
+            if plot_power
                 figure();
+                obj.plot_intensity_power = plot_power;
                 subplot(1,3,1); obj.plot_psf_xy(intensity_3d)
                 subplot(1,3,2); obj.plot_psf_xz(intensity_3d)
                 subplot(1,3,3); obj.plot_psf_yz(intensity_3d)
@@ -102,7 +103,7 @@ classdef AolFftModelAnalyser < handle
             obj.plot_psf(yy, zz, abs(squeeze(max(propagated_wave_2d, [], 2))));
         end 
         function plot_psf(obj, a, b, c)
-            pwr = obj.plot_intensity_squared + 1;
+            pwr = obj.plot_intensity_power;
             h = pcolor(a, b, c.^pwr);
             set(h,'EdgeColor','none')
             colormap(obj.colormap)
